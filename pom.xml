@@ -9,7 +9,7 @@
     </parent>
     <groupId>org.wikimedia.utils</groupId>
     <artifactId>wmf-jvm-utils-parent</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>Set of utilities for java and scala</name>
@@ -35,7 +35,7 @@
             SCM in CI. Namely CI pushes over https when developers typically use ssh.
         -->
         <developerConnection>${developerConnection}</developerConnection>
-        <tag>wmf-jvm-utils-parent-1.0.0</tag>
+        <tag>HEAD</tag>
         <url>https://gerrit.wikimedia.org/r/#/admin/projects/wmf-jvm-utils</url>
     </scm>
 
