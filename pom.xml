@@ -26,7 +26,6 @@
 
     <modules>
         <module>http-client-utils</module>
-        <module>generic-utils</module>
     </modules>
 
     <scm>
