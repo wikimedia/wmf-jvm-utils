@@ -23,8 +23,8 @@ import ru.lanwen.wiremock.ext.WiremockUriResolver;
 import ru.lanwen.wiremock.ext.WiremockUriResolver.WiremockUri;
 
 @ExtendWith({
-        WiremockResolver.class,
-        WiremockUriResolver.class
+    WiremockResolver.class,
+    WiremockUriResolver.class
 })
  class CustomRoutePlannerIntegrationTest {
 
