@@ -2,10 +2,9 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>org.wikimedia.discovery</groupId>
-        <artifactId>discovery-parent-pom</artifactId>
-        <version>1.69</version>
-        <relativePath />
+        <groupId>org.wikimedia</groupId>
+        <artifactId>wmf-jvm-parent-pom</artifactId>
+        <version>1.92</version>
     </parent>
     <groupId>org.wikimedia.utils</groupId>
     <artifactId>wmf-jvm-utils-parent</artifactId>
@@ -42,24 +41,23 @@
 
     <properties>
         <developerConnection>scm:git:ssh://gerrit.wikimedia.org:29418/wmf-jvm-utils</developerConnection>
+        <gitlab.projectId>3198</gitlab.projectId>
         <lucene.version>8.10.1</lucene.version>
     </properties>
 
     <dependencyManagement>
-        <!-- Decalare the default parameters for some dependencies. -->
-
         <dependencies>
-            <dependency>
-                <groupId>org.apache.httpcomponents</groupId>
-                <artifactId>httpclient</artifactId>
-                <version>4.5.12</version>
-            </dependency>
             <dependency>
                 <groupId>org.junit</groupId>
                 <artifactId>junit-bom</artifactId>
                 <version>5.7.1</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.httpcomponents</groupId>
+                <artifactId>httpclient</artifactId>
+                <version>4.5.12</version>
             </dependency>
             <!-- Test deps -->
             <dependency>
