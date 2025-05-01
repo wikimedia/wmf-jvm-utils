@@ -26,6 +26,7 @@
 
     <modules>
         <module>http-client-utils</module>
+        <module>lucene-regex-rewriter</module>
     </modules>
 
     <scm>
@@ -41,6 +42,7 @@
 
     <properties>
         <developerConnection>scm:git:ssh://gerrit.wikimedia.org:29418/wmf-jvm-utils</developerConnection>
+        <lucene.version>8.10.1</lucene.version>
     </properties>
 
     <dependencyManagement>
@@ -64,6 +66,12 @@
                 <groupId>com.github.tomakehurst</groupId>
                 <artifactId>wiremock-jre8</artifactId>
                 <version>2.27.2</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.lucene</groupId>
+                <artifactId>lucene-misc</artifactId>
+                <version>${lucene.version}</version>
                 <scope>test</scope>
             </dependency>
             <dependency>
