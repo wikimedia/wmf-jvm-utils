@@ -8,7 +8,7 @@
     </parent>
     <groupId>org.wikimedia.utils</groupId>
     <artifactId>wmf-jvm-utils-parent</artifactId>
-    <version>1.0.1</version>
+    <version>1.0.2-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>Set of utilities for java and scala</name>
