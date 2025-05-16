@@ -4,7 +4,7 @@
     <parent>
         <groupId>org.wikimedia</groupId>
         <artifactId>wmf-jvm-parent-pom</artifactId>
-        <version>1.92</version>
+        <version>1.96</version>
     </parent>
     <groupId>org.wikimedia.utils</groupId>
     <artifactId>wmf-jvm-utils-parent</artifactId>
@@ -35,13 +35,11 @@
             SCM in CI. Namely CI pushes over https when developers typically use ssh.
         -->
         <developerConnection>${developerConnection}</developerConnection>
-        <tag>wmf-jvm-utils-parent-1.0.1</tag>
-        <url>https://gerrit.wikimedia.org/r/#/admin/projects/wmf-jvm-utils</url>
+        <url>https://gerrit.wikimedia.org/r/admin/repos/wmf-jvm-utils</url>
     </scm>
 
     <properties>
         <developerConnection>scm:git:ssh://gerrit.wikimedia.org:29418/wmf-jvm-utils</developerConnection>
-        <gitlab.projectId>3198</gitlab.projectId>
         <lucene.version>8.10.1</lucene.version>
     </properties>
 
