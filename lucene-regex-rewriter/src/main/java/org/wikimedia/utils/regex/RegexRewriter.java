@@ -48,10 +48,11 @@ public final class RegexRewriter {
      * By replacing the anchors in the regex and adding the anchor markers both in the rechecker and at
      * index time via a pattern_replace char_filter, we can offer full support for start and end anchors.
      */
-    @SuppressWarnings("CyclomaticComplexity")
+    @SuppressWarnings({"CyclomaticComplexity", "NPathComplexity"})
     static CharSequence replaceAnchors(CharSequence input) {
         StringBuilder result = new StringBuilder();
         boolean inCharClass = false;
+        boolean inLiteral  = false;
         int backslashCount = 0;
 
         for (int i = 0; i < input.length(); i++) {
@@ -65,7 +66,13 @@ public final class RegexRewriter {
                 backslashCount = 0;
             }
 
-            if (!escaped) {
+            if (!inLiteral && !inCharClass && !escaped && c == '"') {
+                inLiteral = true;
+            } else if (inLiteral && c == '"') {
+                inLiteral = false;
+            }
+
+            if (!inLiteral && !escaped) {
                 if (c == '[') {
                     inCharClass = true;
                 } else if (c == ']' && inCharClass) {
@@ -73,7 +80,9 @@ public final class RegexRewriter {
                 }
             }
 
-            if (!inCharClass && !escaped && c == '^') {
+            if (inLiteral) {
+                result.append(c);
+            } else if (!inCharClass && !escaped && c == '^') {
                 result.append(START_ANCHOR_MARKER);
             } else if (!inCharClass && !escaped && c == '$') {
                 result.append(END_ANCHOR_MARKER);
@@ -121,12 +130,13 @@ public final class RegexRewriter {
         return result.append(']').toString();
     }
 
-    @SuppressWarnings("CyclomaticComplexity")
+    @SuppressWarnings({"CyclomaticComplexity", "NPathComplexity"})
     @SuppressFBWarnings(value = "MUI_CONTAINSKEY_BEFORE_GET", justification = "More obviously correct this way")
      static CharSequence replaceCharClasses(CharSequence input) {
         StringBuilder result = new StringBuilder();
         int charClassStart = -1;
         boolean inCharClass = false;
+        boolean inLiteral = false;
         int backslashCount = 0;
 
         for (int i = 0; i < input.length(); i++) {
@@ -140,7 +150,15 @@ public final class RegexRewriter {
                 backslashCount = 0;
             }
 
-            if (!inCharClass && !escaped && c == '[') {
+            if (!inLiteral && !inCharClass && !escaped && c == '"') {
+                inLiteral = true;
+            } else if (inLiteral && c == '"') {
+                inLiteral = false;
+            }
+
+            if (inLiteral) {
+                result.append(c);
+            } else if (!inCharClass && !escaped && c == '[') {
                 inCharClass = true;
                 charClassStart = i + 1;
             } else if (inCharClass && !escaped && c == ']') {

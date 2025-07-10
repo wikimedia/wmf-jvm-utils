@@ -100,6 +100,55 @@ class RegexRewriteTest {
     }
 
     @Test
+    void testQuotedLiterals() {
+        // empty quoted literal passes through
+        assertNoCharClassReplacement("\"\"");
+        // Quotes define literals that should not be expanded
+        assertNoCharClassReplacement("\".\"");
+        assertCharClassReplacement("[^\uFDD0\uFDD1]\".\"[^\uFDD0\uFDD1]", ".\".\".");
+        // source query is invalid with unpaired quotes. We passthru to let next stage fail
+        assertNoCharClassReplacement("\"unclosed");
+        // Quotes inside a char class do not start a literal
+        assertCharClassReplacement("[^\uFDD0\uFDD1\"]", "[^\"]");
+        // escaped quotes do not start a literal
+        assertCharClassReplacement("\\\"[^\uFDD0\uFDD1]", "\\\".");
+        // expands shorthands on each edge of the literal
+        assertCharClassReplacement("[0-9]\"abc\"", "\\d\"abc\"");
+        assertCharClassReplacement("\"abc\"[0-9]", "\"abc\"\\d");
+        // no shorthand expansion inside the literal
+        assertNoCharClassReplacement("\"\\s\\d\\w\"");
+        // unquoted anchors are replaced when quotes are present
+        assertAnchorReplacement("\uFDD0\"^$\"\uFDD1", "^\"^$\"$");
+        // quoted anchors are literals, not to be expanded
+        assertNoAnchorReplacement("\"^$\"");
+        // anchors also passthru unclosed quotes to next layer
+        assertAnchorReplacement("\uFDD0\"^$", "^\"^$");
+        // Escaped backslash before quote (should start literal)
+        assertNoCharClassReplacement("\\\\\"literal\"");
+        // Double-escaped quote (should expand the dot)
+        assertCharClassReplacement("\\\\\\\"[^\uFDD0\uFDD1]", "\\\\\\\".");
+        // Quote escaped with multiple backslashes
+        assertCharClassReplacement("\\\\\\\\\\\"[^\uFDD0\uFDD1]", "\\\\\\\\\\\".");
+        // Quote at different positions in char class
+        assertNoCharClassReplacement("[\".]");
+        assertCharClassReplacement("[^\uFDD0\uFDD1.\"]", "[^.\"]");
+        assertNoCharClassReplacement("[a\".z]");
+        // Multiple quotes in char class
+        assertNoCharClassReplacement("[\"\".]");
+        // Quote at end of string
+        assertNoCharClassReplacement("pattern\"");
+        assertNoAnchorReplacement("pattern\"");
+        // Only quote character
+        assertNoCharClassReplacement("\"");
+        assertNoAnchorReplacement("\"");
+        // Quote after escape at end
+        assertNoCharClassReplacement("pattern\\\"");
+        // quote inside the literal cant be escaped, the escape is literal
+        assertCharClassReplacement("\"abc\\\"[0-9]", "\"abc\\\"\\d");
+        assertAnchorReplacement("\"abc\\\"\uFDD1", "\"abc\\\"$");
+    }
+
+    @Test
     void testUnknownEscapeSequences() {
         assertCharClassReplacement("[0-9]\\q", "\\d\\q");
         assertCharClassReplacement("[0-9\\q]", "[\\d\\q]");
