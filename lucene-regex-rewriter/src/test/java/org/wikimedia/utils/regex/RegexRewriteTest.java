@@ -222,4 +222,60 @@ class RegexRewriteTest {
         assertNoAnchorReplacement("\\");
         assertAnchorReplacement("\uFDD0\uFDD1", "^$");
     }
+
+    @Test
+    void testComplexCharacterClassRanges() {
+        // Invalid ranges with character class shortcuts
+        assertCharClassReplacement("[A-0-9]", "[A-\\d]"); // Already covered but worth grouping
+        assertCharClassReplacement("[0-9-z]", "[\\d-z]");
+        assertCharClassReplacement("[a-0-9-Z]", "[a-\\d-Z]");
+
+        // Shorthand at range boundaries (invalid but should handle gracefully)
+        assertCharClassReplacement("[a-0-9z]", "[a-\\dz]");
+        assertCharClassReplacement("[0-9-z]", "[\\d-z]");
+
+        // Multiple ranges with shortcuts
+        assertCharClassReplacement("[a-z0-9A-Z]", "[a-z\\dA-Z]");
+        assertCharClassReplacement("[0-9a-zA-ZA-Za-z0-9_]", "[\\da-zA-Z\\w]");
+
+        // Negated complex ranges
+        assertCharClassReplacement("[^\uFDD0\uFDD1a-z0-9]", "[^a-z\\d]");
+        assertCharClassReplacement("[^\uFDD0\uFDD1A-Za-z0-9_a-z]", "[^\\wa-z]");
+
+        // Edge case: shorthand immediately after range dash
+        assertCharClassReplacement("[a-0-9]", "[a-\\d]");
+        assertCharClassReplacement("[z-A-Za-z0-9_]", "[z-\\w]");
+
+        // Multiple shortcuts in ranges
+        assertCharClassReplacement("[0-9A-Za-z0-9_\f\n\r\t\u0011\u0020\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]", "[\\d\\w\\s]");
+    }
+
+    @Test
+    void testPathologicalBackslashes() {
+        // Many consecutive backslashes with shortcuts
+        String twoBackslashes = "\\\\d";
+        String fourBackslashes = "\\\\\\\\d";
+        String sixBackslashes = "\\\\\\\\\\\\d";
+
+        // two backslashes
+        assertNoCharClassReplacement("\\\\d");
+        // four backslashes
+        assertNoCharClassReplacement("\\\\\\\\d");  // \\\\d -> two literal backslashes + \d expansion
+        // six backslashes
+        assertNoCharClassReplacement("\\\\\\\\\\\\d");  // \\\\\\d -> three literal backslashes + d
+
+        // Pathological backslashes with anchors
+        assertNoAnchorReplacement("\\\\\\^");    // Escaped backslash + escaped anchor
+        assertAnchorReplacement("\\\\\uFDD0", "\\\\^");  // Two backslashes + anchor
+        assertNoAnchorReplacement("\\\\\\^");  // Three backslashes + escaped anchor
+
+        // Long sequences
+        String manyBackslashes = "\\\\\\\\\\\\\\\\\\\\"; // 10 backslashes
+        assertNoCharClassReplacement(manyBackslashes + "d");
+        assertCharClassReplacement(manyBackslashes + "[0-9]", manyBackslashes + "\\d");
+
+        // Backslashes at end of constructs
+        assertNoCharClassReplacement("[abc\\\\]");
+        assertNoAnchorReplacement("test\\\\");
+    }
 }
