@@ -11,6 +11,7 @@ public final class RegexRewriter {
     public static final char END_ANCHOR_MARKER = '\uFDD1';
 
     private static final Map<Character, String> CHAR_CLASSES;
+    private static final Map<Character, Character> ESCAPE_CODES;
 
     static {
         Map<Character, String> charClasses = new HashMap<>();
@@ -18,6 +19,12 @@ public final class RegexRewriter {
         charClasses.put('w', "A-Za-z0-9_");
         charClasses.put('s', "\f\n\r\t\u0011\u0020\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff");
         CHAR_CLASSES = Collections.unmodifiableMap(charClasses);
+
+        Map<Character, Character> escapeCodes = new HashMap<>();
+        escapeCodes.put('r', '\r');
+        escapeCodes.put('n', '\n');
+        escapeCodes.put('t', '\t');
+        ESCAPE_CODES = Collections.unmodifiableMap(escapeCodes);
     }
 
     private RegexRewriter() {
@@ -34,13 +41,17 @@ public final class RegexRewriter {
      * Rewrites the provided regex to support character classes and optionally anchors.
      * If anchor support is enabled then RegexRewriter.anchorTransformation must be applied
      * to strings to be checked.
+     * It's perhaps inefficient that this rewrites the regex multiple times, but the
+     * implementation is easier to reason about as separate transformations.
      */
     public static CharSequence rewrite(CharSequence regex, boolean replaceAnchors) {
         CharSequence result = replaceCharClasses(regex);
         if (replaceAnchors) {
             result = replaceAnchors(result);
         }
-        return result;
+        // expandEscapeCodes must transform last so unicode expansions stay
+        // literals and can't be interpreted as char classes.
+        return expandEscapeCodes(result);
     }
 
     /**
@@ -67,6 +78,43 @@ public final class RegexRewriter {
             }
         }
 
+        return result.toString();
+    }
+
+    private static boolean isValidHexSubSequence(CharSequence input, int i, int len) {
+        if (i + len > input.length()) {
+            return false;
+        }
+        CharSequence maybeHex = input.subSequence(i, i + len);
+        return  maybeHex.chars().allMatch((hexChar) -> Character.digit(hexChar, 16) >= 0);
+    }
+
+    @SuppressWarnings({"ModifiedControlVariable"})
+    @SuppressFBWarnings(value = "MUI_CONTAINSKEY_BEFORE_GET", justification = "More obviously correct this way")
+    static CharSequence expandEscapeCodes(CharSequence input) {
+        StringBuilder result = new StringBuilder();
+        RegexParseState parse = new RegexParseState(input);
+
+        for (int i = 0; i < input.length(); i++) {
+            char c = parse.next(i);
+
+            if (parse.inLiteral) {
+                result.append(c);
+            } else if (parse.escaped && ESCAPE_CODES.containsKey(c)) {
+                result.setLength(result.length() - 1);
+                result.append(ESCAPE_CODES.get(c));
+            } else if (parse.escaped && c == 'u' && isValidHexSubSequence(input, i + 1, 4)) {
+                String hex = input.subSequence(i + 1, i + 5).toString();
+                int cp = Integer.parseInt(hex, 16);
+                result.setLength(result.length() - 1);
+                // prepending \ treats it as a literal value.
+                result.append('\\');
+                result.append((char) cp);
+                i += 4;
+            } else {
+                result.append(c);
+            }
+        }
         return result.toString();
     }
 

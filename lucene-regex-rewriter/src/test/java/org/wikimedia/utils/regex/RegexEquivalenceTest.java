@@ -57,6 +57,8 @@ class RegexEquivalenceTest {
         sources.put("numbers", "12345");
         sources.put("edgecase1", "Start^Middle$End");
         sources.put("edgecase2", "^foo bar$");
+        sources.put("newline", "\n");
+        sources.put("multiline", "qwe\n\nrty");
 
         // Basic start anchor
         assertPatternMatch(sources, "^abc", "findme");
@@ -94,13 +96,43 @@ class RegexEquivalenceTest {
         // \d matches numbers
         assertPatternMatch(sources, "\\d", "numbers");
         // [^\d] matches not-numbers
-        assertPatternMatch(sources, "[^\\d]", "findme", "edgecase1", "edgecase2");
+        assertPatternMatch(sources, "[^\\d]", "findme", "edgecase1", "edgecase2", "newline", "multiline");
         // \s matches spaces
-        assertPatternMatch(sources, "\\s", "edgecase2");
+        assertPatternMatch(sources, "\\s", "edgecase2", "newline", "multiline");
         // [^\s] matches not-spaces
         assertPatternMatch(sources, "^[^\\s]+$", "findme", "numbers", "edgecase1");
         // \w matches word-like things, it does not match spaces or special chars
         assertPatternMatch(sources, "^\\w+$", "findme", "numbers");
-        assertPatternMatch(sources, "[^\\w]", "edgecase1", "edgecase2");
+        assertPatternMatch(sources, "[^\\w]", "edgecase1", "edgecase2", "newline", "multiline");
+        // escape code expansion
+        assertPatternMatch(sources, "\\n", "newline", "multiline");
+        assertPatternMatch(sources, "\\u000a", "newline", "multiline");
+        // multiline match
+        assertPatternMatch(sources, "qwe[\\r\\n]+rty", "multiline");
+        // expansion of regex syntax, \u002e is '.' but must not be treated as the any-match
+        assertNoPatternMatch(sources, "abcde\\u002e");
+        // expansion of the expected char should match
+        assertPatternMatch(sources, "abcde\\u0066", "findme");
+        // same but inside a character class
+        assertNoPatternMatch(sources, "abcde[\\u002e]");
+        assertPatternMatch(sources, "abcde[\\u0066]", "findme");
+        // Expanded \\u can't be interpreted as a char class to expand (\\u0064 == 'd')
+        assertNoPatternMatch(sources, "\\\\u0064");
+    }
+
+    @Test
+    void testUnicode() {
+        Map<String, String> sources = new HashMap<>();
+        sources.put("emoji", "😀");
+        sources.put("water", "水");
+
+        // Can find emoji
+        assertPatternMatch(sources, "\\uD83D\\uDE00", "emoji");
+        // Can find 3-byte character
+        assertPatternMatch(sources, "\\u6c34", "water");
+        // Can not match on partial surrogate pairs (only equivalent on java 15+, prior to that
+        // the java Pattern class could match half pairs.)
+        // assertNoPatternMatch(sources, "\\uD83D");
+        // assertNoPatternMatch(sources, "\\uDE00");
     }
 }

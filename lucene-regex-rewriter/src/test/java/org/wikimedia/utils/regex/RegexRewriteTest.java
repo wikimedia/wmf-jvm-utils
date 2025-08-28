@@ -210,6 +210,126 @@ class RegexRewriteTest {
         assertNoAnchorReplacement("foo\\\\\\^bar");
     }
 
+    private void assertEscapeExpansion(String expected, String regex) {
+        assertThat(RegexRewriter.expandEscapeCodes(regex)).isEqualTo(expected);
+    }
+
+    private void assertNoEscapeExpansion(String regex) {
+        assertThat(RegexRewriter.expandEscapeCodes(regex)).isEqualTo(regex);
+    }
+
+    @Test
+    void testEscapeExpansionLiteralString() {
+        // empty literal passthru
+        assertNoEscapeExpansion("\"\"");
+        // escape in a quoted literal should not expand
+        assertNoEscapeExpansion("\"\\t\"");
+        // multiple quoted literals should not expand
+        assertNoEscapeExpansion("\"\\t\" \"\\t\"");
+        // unclosed literal should not expand
+        assertNoEscapeExpansion("\"\\t");
+        // should expand before a literal
+        assertEscapeExpansion("\n\"\\n\"", "\\n\"\\n\"");
+        // should expand after a literal
+        assertEscapeExpansion("\"\\n\"\n", "\"\\n\"\\n");
+        // should expand between quoted literals
+        assertEscapeExpansion("\"\\t\"\n\"\\t\"", "\"\\t\"\\n\"\\t\"");
+    }
+
+    @Test
+    void testEscapeExpansionCharClasses() {
+        // unclosed character class
+        assertEscapeExpansion("[\t", "[\\t");
+        // empty character class
+        assertNoEscapeExpansion("[]");
+        // escape in a character class should expand
+        assertEscapeExpansion("[\r\n]", "[\\r\\n]");
+        // nested char class (invalid but should handle)
+        assertEscapeExpansion("[\t[\n]]", "[\\t[\\n]]");
+    }
+
+    @Test
+    void testEscapeExpansionUnicodeEdgeCases() {
+        // Unicode at end of string (incomplete)
+        assertNoEscapeExpansion("\\u123");
+        assertNoEscapeExpansion("\\u12");
+        assertNoEscapeExpansion("\\u1");
+        assertNoEscapeExpansion("\\u");
+
+        // Unicode with uppercase hex
+        assertEscapeExpansion("\\\u000C", "\\u000C");
+        assertEscapeExpansion("\\\u00FF", "\\u00FF");
+
+        // Unicode with mixed case
+        assertEscapeExpansion("\\\u00Af", "\\u00Af");
+
+        // Multiple unicode escapes
+        assertEscapeExpansion("\\\u0009\\\n", "\\u0009\\u000A");
+
+        // Unicode zero
+        assertEscapeExpansion("\\\u0000", "\\u0000");
+
+        // Unicode with non-hex after valid 4 chars
+        assertEscapeExpansion("\\\u0009g", "\\u0009g");
+
+        // Invalid hex characters
+        assertNoEscapeExpansion("\\u000g");
+        assertNoEscapeExpansion("\\u00g0");
+        assertNoEscapeExpansion("\\ug000");
+        assertNoEscapeExpansion("\\u000G"); // uppercase G invalid
+
+        // invalid followed by valid
+        assertEscapeExpansion("\\u00\\\u000e", "\\u00\\u000e");
+    }
+
+    @Test
+    void testEscapeExpansionBackslashCount() {
+        // only backslashes
+        assertNoEscapeExpansion("\\");
+        assertNoEscapeExpansion("\\\\");
+        // single backslash
+        assertEscapeExpansion("\n", "\\n");
+        // double backslash
+        assertNoEscapeExpansion("\\\\n");
+        // triple backslash
+        assertEscapeExpansion("\\\\\n", "\\\\\\n");
+    }
+
+    @Test
+    void testEscapeExpansionStateTransitions() {
+        // Transition from literal to character class
+        assertEscapeExpansion("\"abc\"[\t]", "\"abc\"[\\t]");
+        // Transition from character class to literal
+        assertEscapeExpansion("[\t]\"\\n\"", "[\\t]\"\\n\"");
+        // Multiple state changes in one regex
+        assertEscapeExpansion("\\\\t\"\\n\"[\n]\\\\t", "\\\\t\"\\n\"[\\n]\\\\t");
+    }
+
+    @Test
+    void testEscapeExpansionErrorRecovery() {
+        // Malformed but should continue processing
+        assertEscapeExpansion("\\uabcq\t", "\\uabcq\\t");
+        // Mixed valid and invalid
+        assertEscapeExpansion("\\\u0009\\uabcq\n", "\\u0009\\uabcq\\n");
+    }
+
+    @Test
+    void testBasicEscapeSequenceExpansion() {
+        // escape with nothing after should passthru
+        assertNoEscapeExpansion("\\");
+        // no defined expansion
+        assertNoEscapeExpansion("\\q\\.");
+        // simple expansion
+        assertEscapeExpansion("\t\r\n", "\\t\\r\\n");
+        // unicode escapes should expand
+        assertEscapeExpansion("\\\u000c", "\\u000c");
+        // unicode escapes with non-hex value should passthru
+        assertNoEscapeExpansion("\\uabcq");
+        // short unicode escape should passthru
+        assertNoEscapeExpansion("\\u00");
+    }
+
+
     @Test
     void testMultipleAnchors() {
         assertAnchorReplacement("\uFDD0abc\uFDD1|\uFDD0def\uFDD1", "^abc$|^def$");
@@ -221,6 +341,48 @@ class RegexRewriteTest {
         assertNoAnchorReplacement("");
         assertNoAnchorReplacement("\\");
         assertAnchorReplacement("\uFDD0\uFDD1", "^$");
+    }
+
+    @Test
+    void testUnicodeSurrogatePairs() {
+        // unicode escapes for characters beyond BMP
+        // (joined with + because otherwise the compiler complains of illegal escape character)
+        assertEscapeExpansion("\\\uD835" + "\\\uDC00", "\\uD835\\uDC00"); // Mathematical bold A
+        assertEscapeExpansion("\\\uD83D" + "\\\uDE00", "\\uD83D\\uDE00"); // Grinning face emoji
+        assertEscapeExpansion("\\\uD835" + "\\\uDFCF" + "\\\uD835" + "\\\uDFD0", "\\uD835\\uDFCF\\uD835\\uDFD0"); // Mathematical bold digits
+        // incomplete surrogate pairs (they expand! maybe not ideal). In testing the
+        // downstream regex engine will not match half a surrogate pair.
+        assertEscapeExpansion("\\\uD83D", "\\uD83D"); // High surrogate without low
+        assertEscapeExpansion("\\\uDE00", "\\uDE00"); // Low surrogate without high
+        // invalid surrogate sequences (also expands! also won't match anything).
+        assertEscapeExpansion("\\\uuD83D\n", "\\uD83D\\n"); // High surrogate + regular escape
+        // surrogate pairs in character classes (see also RegexEquivalenceTest.testUnicode)
+        assertEscapeExpansion("[\\\uD83D" + "\\\uDE00]", "[\\uD83D\\uDE00]");
+        // surrogate pairs in quoted literals (should not expand)
+        assertNoEscapeExpansion("\"\\uD83D\\uDE00\"");
+    }
+
+    @Test
+    void testMixedEscapeTypes() {
+        // Mix unicode and regular escapes for same character
+        assertEscapeExpansion("\\\n\n", "\\u000A\\n");
+        assertEscapeExpansion("\\\t\t", "\\u0009\\t");
+        assertEscapeExpansion("\\\r\r", "\\u000D\\r");
+
+        // Mix valid and invalid unicode escapes
+        assertEscapeExpansion("\\u00\n", "\\u00\\n");
+        assertEscapeExpansion("\n\\uabcg", "\\n\\uabcg");
+
+        // Escaped backslash before unicode
+        assertNoEscapeExpansion("\\\\u000A");
+        assertEscapeExpansion("\\\\\n", "\\\\\\n");
+
+        // Multiple mixed escapes in sequence
+        assertEscapeExpansion("\t\\u00g0\r\n", "\\t\\u00g0\\r\\n");
+
+        // Mixed escapes in character classes
+        assertEscapeExpansion("[\\\t\n]", "[\\u0009\\n]");
+        assertEscapeExpansion("[\t\\u00g0]", "[\\t\\u00g0]");
     }
 
     @Test
@@ -269,6 +431,11 @@ class RegexRewriteTest {
         assertAnchorReplacement("\\\\\uFDD0", "\\\\^");  // Two backslashes + anchor
         assertNoAnchorReplacement("\\\\\\^");  // Three backslashes + escaped anchor
 
+        // Pathological backslashes with unicode
+        assertNoEscapeExpansion("\\\\u000A");      // 2 backslashes + unicode (no expansion)
+        assertEscapeExpansion("\\\\\\\n", "\\\\\\u000A");  // 3 backslashes + unicode (expands)
+        assertNoEscapeExpansion("\\\\\\\\u000A");  // 4 backslashes + unicode (no expansion)
+
         // Long sequences
         String manyBackslashes = "\\\\\\\\\\\\\\\\\\\\"; // 10 backslashes
         assertNoCharClassReplacement(manyBackslashes + "d");
@@ -277,5 +444,6 @@ class RegexRewriteTest {
         // Backslashes at end of constructs
         assertNoCharClassReplacement("[abc\\\\]");
         assertNoAnchorReplacement("test\\\\");
+        assertNoEscapeExpansion("pattern\\\\");
     }
 }
